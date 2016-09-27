@@ -102,6 +102,7 @@ namespace g2o {
       cerr << "Simulator: sampling nodes ...";
       while ((int)poses.size() < numNodes) {
         // add straight motions
+          // max: go straight 5 meter in local frame x direction
         for (int i = 1; i < steps && (int)poses.size() < numNodes; ++i) {
           Simulator::GridPose nextGridPose = generateNewPose(poses.back(), SE2(stepLen,0,0), transNoise, rotNoise);
           poses.push_back(nextGridPose);
@@ -115,7 +116,7 @@ namespace g2o {
         while (probLimits[motionDirection] < sampleMove && motionDirection+1 < MO_NUM_ELEMS) {
           motionDirection++;
         }
-
+        // max: make a pose with new direction
         SE2 nextMotionStep = getMotion(motionDirection, stepLen);
         Simulator::GridPose nextGridPose = generateNewPose(poses.back(), nextMotionStep, transNoise, rotNoise);
 
@@ -130,11 +131,12 @@ namespace g2o {
             nextStepFinalPose = nextGridPose.truePose * maxStepTransf;
             if (fabs(nextStepFinalPose.translation().x()) < bound[0] && fabs(nextStepFinalPose.translation().y()) < bound[1])
               break;
-          }
-        }
+          }// end for MO_NUM_ELEMS
+        }// end if fabs
 
         poses.push_back(nextGridPose);
-      }
+      }// end while numNodes
+
       cerr << "done." << endl;
 
       // creating landmarks along the trajectory
@@ -162,7 +164,7 @@ namespace g2o {
               }
             }
           }
-      }
+      }// end for poses
       cerr << "done." << endl;
 
       cerr << "Simulator: Simulating landmark observations for the poses ... ";
@@ -201,10 +203,10 @@ namespace g2o {
               }
               l->seenBy.push_back(pv.id);
               pv.landmarks.push_back(l);
-            }
-          }
+            } // end for i
+          } // end for yy
 
-      }
+      } // end for poses
       cerr << "done." << endl;
 
       // add the odometry measurements
