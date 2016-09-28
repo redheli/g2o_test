@@ -15,7 +15,68 @@ namespace g2o {
 class Simulator3D
 {
 public:
+    enum MotionType {
+      MO_LEFT, MO_RIGHT,
+      MO_NUM_ELEMS
+    };
+
+    /**
+     * \brief simulated landmark
+     */
+    struct Landmark
+    {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+      int id;
+      Eigen::Vector2d truePose;
+      Eigen::Vector2d simulatedPose;
+      std::vector<int> seenBy;
+      Landmark() : id(-1) {}
+    };
+    typedef std::vector<Landmark, Eigen::aligned_allocator<Landmark> > LandmarkVector;
+    typedef std::vector<Landmark*> LandmarkPtrVector;
+
+    /**
+     * simulated pose of the robot
+     */
+    struct GridPose3D
+    {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+      int id;
+      Eigen::Isometry3d truePose;
+      Eigen::Isometry3d simulatorPose;
+      LandmarkPtrVector landmarks;      ///< the landmarks observed by this node
+    };
+
+    /**
+     * \brief odometry constraint
+     */
+    struct GridEdge3D
+    {
+      int from;
+      int to;
+      Eigen::Isometry3d trueTransf;
+      Eigen::Isometry3d simulatorTransf;
+      Eigen::Matrix<double,6,6,Eigen::ColMajor> information;
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    };
+    typedef std::vector<GridEdge3D, Eigen::aligned_allocator<GridEdge3D> >  GridEdge3DVector;
+
+    struct LandmarkEdge
+    {
+      int from;
+      int to;
+      Eigen::Vector2d trueMeas;
+      Eigen::Vector2d simulatorMeas;
+      Eigen::Matrix2d information;
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    };
+    typedef std::vector<LandmarkEdge, Eigen::aligned_allocator<LandmarkEdge> >  LandmarkEdgeVector;
+
+public:
     Simulator3D();
+
+    void simulate(int numPoses, const SE2& sensorOffset = SE2(), bool sim_roll=true,
+                  bool sim_pitch=true);
 };
 
   } // end namespace
