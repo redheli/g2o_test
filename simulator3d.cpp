@@ -181,7 +181,49 @@ void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll,
     }// end for poses
     cerr << "done." << endl;
 
+    cerr << "Simulator: Simulating landmark observations for the poses ... ";
+    double maxSensorSqr = maxSensorRangeLandmarks * maxSensorRangeLandmarks;
+    int globalId = 0;
+    for (PosesVector::iterator it = poses_.begin(); it != poses_.end(); ++it) {
+      Simulator3D::GridPose3D& pv = *it;
+      Eigen::Vector3d gtTrans = pv.truePose.translation();
+      int cx = (int)round(gtTrans[0]); // x
+      int cy = (int)round(gtTrans[1]); // y
+      int cz = (int)round(gtTrans[2]); // z
+      int numGridCells = (int)(maxSensorRangeLandmarks) + 1;
 
+      pv.id = globalId++;
+      Eigen::Isometry3d trueInv = pv.truePose.inverse();
+
+      for (int xx = cx - numGridCells; xx <= cx + numGridCells; ++xx)
+        for (int yy = cy - numGridCells; yy <= cy + numGridCells; ++yy) {
+          LandmarkPtrVector& landmarksForCell = grid[xx][yy];
+          if (landmarksForCell.size() == 0)
+            continue;
+          for (size_t i = 0; i < landmarksForCell.size(); ++i) {
+            Landmark* l = landmarksForCell[i];
+            double dSqr = hypot_sqr(pv.truePose.translation().x() - l->truePose.x(), pv.truePose.translation().y() - l->truePose.y());
+            if (dSqr > maxSensorSqr)
+              continue;
+            double obs = Rand::uniform_rand(0.0, 1.0);
+            if (obs > observationProb) // we do not see this one...
+              continue;
+            if (l->id < 0)
+              l->id = globalId++;
+            if (l->seenBy.size() == 0) {
+              Vector3d trueObservation = trueInv * l->truePose;
+              Vector3d observation = trueObservation;
+              observation[0] += Rand::gauss_rand(0., landmarkNoise[0]);
+              observation[1] += Rand::gauss_rand(0., landmarkNoise[1]);
+              l->simulatedPose = pv.simulatorPose * observation;
+            }
+            l->seenBy.push_back(pv.id);
+            pv.landmarks.push_back(l);
+          } // end for i
+        } // end for yy
+
+    } // end for poses
+    cerr << "done." << endl;
 
 }
 
