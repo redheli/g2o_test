@@ -11,6 +11,7 @@ namespace g2o {
 namespace tutorial {
 
     using namespace Eigen;
+typedef std::map<int, std::map<int, Simulator3D::LandmarkPtrVector> > LandmarkGrid;
 
 Simulator3D::Simulator3D()
 {
@@ -36,7 +37,7 @@ void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll,
     int landmarksRange=2;
 
     Vector3d transNoise(0.05, 0.01, 0.02);
-    Vector3d rotNoise(DEG2RAD(3.),DEG2RAD(1.),DEG2RAD(2.)); // roll,pitch,yaw
+    Vector3d rotNoise(DEG2RAD(3.),DEG2RAD(1.),DEG2RAD(2.)); // yaw pitch roll
     Vector2d landmarkNoise(0.05, 0.05);
 
     Eigen::Matrix<double,6,6,Eigen::ColMajor> covariance;
@@ -48,6 +49,139 @@ void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll,
     covariance(4, 4) = rotNoise[1]*rotNoise[1];
     covariance(5, 5) = rotNoise[2]*rotNoise[2];
     Eigen::Matrix<double,6,6,Eigen::ColMajor> information = covariance.inverse();
+
+    int glb_id=0;
+    // first pose
+    Simulator3D::GridPose3D firstPose;
+    firstPose.id = glb_id++;
+    Eigen::Isometry3d t;
+    Eigen::Matrix3d rot = Eigen::Matrix3d::Zero();
+    t = rot;
+    t.translation() = Eigen::Vector3d(0,0,0);
+    firstPose.truePose = t;
+    firstPose.simulatorPose = t;
+    poses_.push_back(firstPose);
+
+    // first 5 steps
+    double droll = DEG2RAD(30.); // degree
+    double dpitch = DEG2RAD(0.);
+    double dyaw = DEG2RAD(30.); // degree
+    for(int i=0;i<steps;++i){
+        Simulator3D::GridPose3D nextGridPose;
+        nextGridPose.id = glb_id++;
+        // motion
+        Eigen::Isometry3d true_motion;
+        Eigen::Isometry3d noise_motion;
+        // yaw
+        Eigen::AngleAxisd rotz(dyaw / steps, Eigen::Vector3d::UnitZ());
+        Eigen::AngleAxisd rotz_n(dyaw / steps + rotNoise[0], Eigen::Vector3d::UnitZ()); // noise
+        // pitch
+        Eigen::AngleAxisd roty(dpitch / steps, Eigen::Vector3d::UnitY());
+        Eigen::AngleAxisd roty_n(dpitch / steps + rotNoise[1], Eigen::Vector3d::UnitY());
+        // roll
+        Eigen::AngleAxisd rotx(droll / steps, Eigen::Vector3d::UnitX());
+        Eigen::AngleAxisd rotx_n(droll / steps + rotNoise[2], Eigen::Vector3d::UnitX());
+        // rotation
+        Eigen::Matrix3d rot = (rotz * roty * rotx).toRotationMatrix();
+        Eigen::Matrix3d rot_n = (rotz_n * roty_n * rotx_n).toRotationMatrix();
+        true_motion = rot;
+        noise_motion = rot_n;
+        // transform
+        Eigen::Vector3d t = Eigen::Vector3d(stepLen,0,0);
+        Eigen::Vector3d t_n = Eigen::Vector3d(stepLen + transNoise[0],0 + transNoise[1],0 + transNoise[2]);
+        true_motion.translation() = true_motion.linear() * t;
+        noise_motion.translation() = noise_motion.linear() * t_n;
+        // pre pose
+        Simulator3D::GridPose3D &pre = poses_.back();
+        // next true pose
+        Eigen::Isometry3d new_p = pre.truePose * true_motion;
+        // next noise pose
+        Eigen::Isometry3d new_p_n = pre.simulatorPose * noise_motion;
+        nextGridPose.truePose = new_p;
+        nextGridPose.simulatorPose = new_p_n;
+        poses_.push_back(nextGridPose);
+
+    }
+
+    // second 5 steps
+    // droll = 0, dpitch = 0  , dyaw = -10 DEG
+    droll = DEG2RAD(0.); // degree
+    dpitch = DEG2RAD(0.);
+    dyaw = DEG2RAD(-10.); // degree
+    for(int i=0;i<steps;++i){
+        Simulator3D::GridPose3D nextGridPose;
+        nextGridPose.id = glb_id++;
+        // motion
+        Eigen::Isometry3d true_motion;
+        Eigen::Isometry3d noise_motion;
+        // yaw
+        Eigen::AngleAxisd rotz(dyaw / steps, Eigen::Vector3d::UnitZ());
+        Eigen::AngleAxisd rotz_n(dyaw / steps + rotNoise[0], Eigen::Vector3d::UnitZ()); // noise
+        // pitch
+        Eigen::AngleAxisd roty(dpitch / steps, Eigen::Vector3d::UnitY());
+        Eigen::AngleAxisd roty_n(dpitch / steps + rotNoise[1], Eigen::Vector3d::UnitY());
+        // roll
+        Eigen::AngleAxisd rotx(droll / steps, Eigen::Vector3d::UnitX());
+        Eigen::AngleAxisd rotx_n(droll / steps + rotNoise[2], Eigen::Vector3d::UnitX());
+        // rotation
+        Eigen::Matrix3d rot = (rotz * roty * rotx).toRotationMatrix();
+        Eigen::Matrix3d rot_n = (rotz_n * roty_n * rotx_n).toRotationMatrix();
+        true_motion = rot;
+        noise_motion = rot_n;
+        // transform
+        Eigen::Vector3d t = Eigen::Vector3d(stepLen,0,0);
+        Eigen::Vector3d t_n = Eigen::Vector3d(stepLen + transNoise[0],0 + transNoise[1],0 + transNoise[2]);
+        true_motion.translation() = true_motion.linear() * t;
+        noise_motion.translation() = noise_motion.linear() * t_n;
+        // pre pose
+        Simulator3D::GridPose3D &pre = poses_.back();
+        // next true pose
+        Eigen::Isometry3d new_p = pre.truePose * true_motion;
+        // next noise pose
+        Eigen::Isometry3d new_p_n = pre.simulatorPose * noise_motion;
+        nextGridPose.truePose = new_p;
+        nextGridPose.simulatorPose = new_p_n;
+
+        poses_.push_back(nextGridPose);
+    }
+
+    // land mark
+    // creating landmarks along the trajectory
+    cerr << "Simulator: Creating landmarks ... ";
+    LandmarkGrid grid;
+    for (PosesVector::const_iterator it = poses_.begin(); it != poses_.end(); ++it) {
+        const GridPose3D &pose = *it;
+        Eigen::Quaterniond gtQuat = (Eigen::Quaterniond)pose.truePose.linear();
+        Eigen::Vector3d gtTrans = pose.truePose.translation();
+      int ccx = (int)round(gtTrans[0]); // x
+      int ccy = (int)round(gtTrans[1]); // y
+      int ccz = (int)round(gtTrans[2]); // z
+      for (int a=-landmarksRange; a<=landmarksRange; a++)
+        for (int b=-landmarksRange; b<=landmarksRange; b++){
+          int cx=ccx+a;
+          int cy=ccy+b;
+          int cz=ccz+b;
+          LandmarkPtrVector& landmarksForCell = grid[cx][cy];
+          if (landmarksForCell.size() == 0) {
+            for (int i = 0; i < landMarksPerSquareMeter; ++i) {
+              Landmark* l = new Landmark();
+              double offx, offy, offz;
+              do {
+                offx = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+                offy = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+                offz = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+              } while (hypot_sqr(offx, offy) < 0.25*0.25);
+              l->truePose[0] = cx + offx;
+              l->truePose[1] = cy + offy;
+              l->truePose[2] = cz + offz;
+              landmarksForCell.push_back(l);
+            }
+          }
+        }
+    }// end for poses
+    cerr << "done." << endl;
+
+
 
 }
 

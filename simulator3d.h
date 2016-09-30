@@ -27,8 +27,8 @@ public:
     {
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
       int id;
-      Eigen::Vector2d truePose;
-      Eigen::Vector2d simulatedPose;
+      Eigen::Vector3d truePose;
+      Eigen::Vector3d simulatedPose;
       std::vector<int> seenBy;
       Landmark() : id(-1) {}
     };
@@ -46,6 +46,7 @@ public:
       Eigen::Isometry3d simulatorPose;
       LandmarkPtrVector landmarks;      ///< the landmarks observed by this node
     };
+    typedef std::vector<GridPose3D, Eigen::aligned_allocator<GridPose3D> >  PosesVector;
 
     /**
      * \brief odometry constraint
@@ -77,6 +78,12 @@ public:
 
     void simulate(int numPoses, const SE2& sensorOffset = SE2(), bool sim_roll=true,
                   bool sim_pitch=true);
+
+    GridPose3D generateNewPose(const GridPose3D& prev, const SE2& trueMotion, const Eigen::Vector2d& transNoise, double rotNoise);
+
+
+public:
+    PosesVector poses_;
 };
 
   } // end namespace
