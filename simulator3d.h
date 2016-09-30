@@ -66,9 +66,9 @@ public:
     {
       int from;
       int to;
-      Eigen::Vector2d trueMeas;
-      Eigen::Vector2d simulatorMeas;
-      Eigen::Matrix2d information;
+      Eigen::Vector3d trueMeas;
+      Eigen::Vector3d simulatorMeas;
+      Eigen::Matrix3d information;
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     };
     typedef std::vector<LandmarkEdge, Eigen::aligned_allocator<LandmarkEdge> >  LandmarkEdgeVector;
@@ -76,7 +76,7 @@ public:
 public:
     Simulator3D();
 
-    void simulate(int numPoses, const SE2& sensorOffset = SE2(), bool sim_roll=true,
+    void simulate(int numPoses, const Eigen::Vector3d& sensorOffset = Eigen::Vector3d(0,0,0), bool sim_roll=true,
                   bool sim_pitch=true);
 
     GridPose3D generateNewPose(const GridPose3D& prev, const SE2& trueMotion, const Eigen::Vector2d& transNoise, double rotNoise);
@@ -84,6 +84,9 @@ public:
 
 public:
     PosesVector poses_;
+    GridEdge3DVector odometry_;
+    LandmarkVector landmarks_;
+    LandmarkEdgeVector landmarkObservations_;
 };
 
   } // end namespace

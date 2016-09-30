@@ -18,7 +18,7 @@ Simulator3D::Simulator3D()
 
 }
 
-void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll, bool sim_pitch)
+void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bool sim_roll, bool sim_pitch)
 {
     // simulate a robot observing landmarks while travelling on a grid
     int steps = 5;
@@ -38,7 +38,7 @@ void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll,
 
     Vector3d transNoise(0.05, 0.01, 0.02);
     Vector3d rotNoise(DEG2RAD(3.),DEG2RAD(1.),DEG2RAD(2.)); // yaw pitch roll
-    Vector2d landmarkNoise(0.05, 0.05);
+    Vector3d landmarkNoise(0.05, 0.05, 0.05);
 
     Eigen::Matrix<double,6,6,Eigen::ColMajor> covariance;
     covariance.fill(0.);
@@ -225,6 +225,76 @@ void Simulator3D::simulate(int numPoses, const SE2 &sensorOffset, bool sim_roll,
     } // end for poses
     cerr << "done." << endl;
 
+    // add the odometry measurements
+    odometry_.clear();
+    cerr << "Simulator: Adding odometry measurements ... ";
+    for (size_t i = 1; i < poses_.size(); ++i) {
+      const GridPose3D& prev = poses_[i-1];
+      const GridPose3D& p = poses_[i];
+
+      odometry_.push_back(GridEdge3D());
+      GridEdge3D& edge = odometry_.back();
+
+      edge.from = prev.id;
+      edge.to = p.id;
+      edge.trueTransf = prev.truePose.inverse() * p.truePose;
+      edge.simulatorTransf = prev.simulatorPose.inverse() * p.simulatorPose;
+      edge.information = information;
+    }
+    cerr << "done." << endl;
+
+    landmarks_.clear();
+    landmarkObservations_.clear();
+    // add the landmark observations
+    {
+      cerr << "Simulator: add landmark observations ... ";
+      Matrix2d covariance; covariance.fill(0.);
+      covariance(0, 0) = landmarkNoise[0]*landmarkNoise[0];
+      covariance(1, 1) = landmarkNoise[1]*landmarkNoise[1];
+      covariance(2, 2) = landmarkNoise[2]*landmarkNoise[1];
+      Matrix3d information = covariance.inverse();
+
+      for (size_t i = 0; i < poses_.size(); ++i) {
+        const GridPose3D& p = poses_[i];
+        for (size_t j = 0; j < p.landmarks.size(); ++j) {
+          Landmark* l = p.landmarks[j];
+          if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
+            landmarks_.push_back(*l);
+          }
+        }
+      }
+
+      for (size_t i = 0; i < poses_.size(); ++i) {
+        const GridPose3D& p = poses_[i];
+        // convert sensorOffset to Eigen::Isometry3d
+        Eigen::Isometry3d sensor_offset;
+        sensor_offset.translation() = sensorOffset;
+        Eigen::Isometry3d trueInv = (p.truePose * sensor_offset).inverse();
+        for (size_t j = 0; j < p.landmarks.size(); ++j) {
+          Landmark* l = p.landmarks[j];
+          Vector3d observation;
+          Vector3d trueObservation = trueInv * l->truePose;
+          observation = trueObservation;
+          if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) { // write the initial position of the landmark
+            observation = (p.simulatorPose * sensor_offset).inverse() * l->simulatedPose;
+          } else {
+            // create observation for the LANDMARK using the true positions
+            observation[0] += Rand::gauss_rand(0., landmarkNoise[0]);
+            observation[1] += Rand::gauss_rand(0., landmarkNoise[1]);
+          }
+
+          landmarkObservations_.push_back(LandmarkEdge());
+          LandmarkEdge& le = landmarkObservations_.back();
+
+          le.from = p.id;
+          le.to = l->id;
+          le.trueMeas = trueObservation;
+          le.simulatorMeas = observation;
+          le.information = information;
+        }
+      }
+      cerr << "done." << endl;
+    }
 }
 
 } // end namespace
