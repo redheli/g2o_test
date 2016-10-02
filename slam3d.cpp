@@ -138,7 +138,7 @@ int main()
   cerr << "Optimization: add landmark observations ... ";
   for (size_t i = 0; i < simulator.landmarkObservations_.size(); ++i) {
     const Simulator3D::LandmarkEdge& simEdge = simulator.landmarkObservations_[i];
-    EdgeSE3Offset* landmarkObservation =  new EdgeSE3Offset;
+    EdgeSE3PointXYZ* landmarkObservation =  new EdgeSE3PointXYZ;
     landmarkObservation->vertices()[0] = optimizer.vertex(simEdge.from);
     landmarkObservation->vertices()[1] = optimizer.vertex(simEdge.to);
     landmarkObservation->setMeasurement(simEdge.simulatorMeas);

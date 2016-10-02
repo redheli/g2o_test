@@ -72,9 +72,9 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     poses_.push_back(firstPose);
 
     // first 5 steps
-    double droll = DEG2RAD(30.); // degree
+    double droll = DEG2RAD(0.); // degree
     double dpitch = DEG2RAD(0.);
-    double dyaw = DEG2RAD(30.); // degree
+    double dyaw = DEG2RAD(90.); // degree
     for(int i=0;i<steps;++i){
         Simulator3D::GridPose3D nextGridPose;
         nextGridPose.id = glb_id++;
@@ -116,7 +116,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     // droll = 0, dpitch = 0  , dyaw = -10 DEG
     droll = DEG2RAD(0.); // degree
     dpitch = DEG2RAD(0.);
-    dyaw = DEG2RAD(-10.); // degree
+    dyaw = DEG2RAD(-90.); // degree
     for(int i=0;i<steps;++i){
         Simulator3D::GridPose3D nextGridPose;
         nextGridPose.id = glb_id++;
@@ -261,6 +261,9 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
       covariance(0, 0) = landmarkNoise[0]*landmarkNoise[0];
       covariance(1, 1) = landmarkNoise[1]*landmarkNoise[1];
       covariance(2, 2) = landmarkNoise[2]*landmarkNoise[2];
+//      covariance(3, 3) = 0;
+//      covariance(4, 4) = 0;
+//      covariance(5, 5) = 0;
       Matrix3d information = covariance.inverse();
 
       for (size_t i = 0; i < poses_.size(); ++i) {
@@ -297,6 +300,25 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
 
           le.from = p.id;
           le.to = l->id;
+
+          Eigen:: Quaterniond rot;
+        //  q.setIdentity();
+          double roll = 0.0;// -2.05478/57.2957795;
+          double pitch = 0.0;//-0.858026/57.2957795;
+          double yaw = 0.0;//-88.083/57.2957795;
+          Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+          Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+          Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+
+          rot = yawAngle * pitchAngle * rollAngle;
+//          Isometry3D trueObservation_m;
+//          trueObservation_m = rot;
+//          trueObservation_m.translation() = trueObservation;
+
+//          Isometry3D observation_m;
+//          observation_m = rot;
+//          observation_m.translation() = observation;
+
           le.trueMeas = trueObservation;
           le.simulatorMeas = observation;
           le.information = information;
