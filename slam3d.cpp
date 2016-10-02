@@ -58,7 +58,7 @@ int main()
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   Eigen::Vector3d sensorOffsetTransf(0.2, 0.1, -0.1);
-  int numNodes = 10;
+  int numNodes = 30;
   Simulator3D simulator;
   simulator.simulate(numNodes, sensorOffsetTransf);
 

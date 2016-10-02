@@ -36,8 +36,9 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
 
     int landmarksRange=2;
 
-    Vector3d transNoise(0.05, 0.01, 0.02);
-    Vector3d rotNoise(DEG2RAD(0.001),DEG2RAD(0.001),DEG2RAD(-0.5)); // yaw pitch roll
+    Vector3d transNoise(0.1, 0.01, 0.2);
+    Vector3d rotNoise(DEG2RAD(0.3),DEG2RAD(0.6),DEG2RAD(0.8)); // yaw pitch roll
+//    Vector3d rotNoise(0.005,0.005,0.005); // yaw pitch roll
     Vector3d landmarkNoise(0.05, 0.05, 0.05);
 
 //    Eigen::Matrix<double,6,6,Eigen::ColMajor> covariance;
@@ -207,6 +208,26 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     l->truePose = Eigen::Vector3d(1.,2.,0.0);
 //    landmarksForCell.push_back(l);
     landmarks_.push_back(l);
+
+    Landmark* l2 = new Landmark();
+    l2->truePose = Eigen::Vector3d(10.,20.,0.0);
+    landmarks_.push_back(l2);
+
+    Landmark* l3 = new Landmark();
+    l3->truePose = Eigen::Vector3d(5.,10.,0.0);
+    landmarks_.push_back(l3);
+
+    Landmark* l4 = new Landmark();
+    l4->truePose = Eigen::Vector3d(25.,30.,0.0);
+    landmarks_.push_back(l4);
+
+    Landmark* l5 = new Landmark();
+    l5->truePose = Eigen::Vector3d(35.,50.,0.0);
+    landmarks_.push_back(l5);
+
+    Landmark* l6 = new Landmark();
+    l6->truePose = Eigen::Vector3d(25.,60.,0.0);
+    landmarks_.push_back(l6);
 
     cerr << "done." << endl;
 
