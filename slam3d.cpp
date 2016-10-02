@@ -127,10 +127,10 @@ int main()
   // add the landmark observations
   cerr << "Optimization: add landmark vertices ... ";
   for (size_t i = 0; i < simulator.landmarks_.size(); ++i) {
-    const Simulator3D::Landmark& l = simulator.landmarks_[i];
+    const Simulator3D::Landmark* l = simulator.landmarks_[i];
     VertexPointXYZ* landmark = new VertexPointXYZ;
-    landmark->setId(l.id);
-    landmark->setEstimate(l.simulatedPose);
+    landmark->setId(l->id);
+    landmark->setEstimate(l->simulatedPose);
     optimizer.addVertex(landmark);
   }
   cerr << "done." << endl;

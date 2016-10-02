@@ -85,7 +85,7 @@ public:
 public:
     PosesVector poses_;
     GridEdge3DVector odometry_;
-    LandmarkVector landmarks_;
+    LandmarkPtrVector landmarks_;
     LandmarkEdgeVector landmarkObservations_;
 };
 

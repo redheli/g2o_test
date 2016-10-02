@@ -29,7 +29,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     // at begin decide roll,pitch,yaw value of the round
     // at noise at each step
 
-    double maxSensorRangeLandmarks = 2.5 * stepLen;
+    double maxSensorRangeLandmarks = 30 * stepLen;
 
     int landMarksPerSquareMeter = 1;
     double observationProb = 0.8;
@@ -60,10 +60,10 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     information.block<3,3>(0,0) = trans_Noise.inverse();
     information.block<3,3>(3,3) = rot_Noise.inverse();
 
-    int glb_id=0;
+//    int glb_id=0;
     // first pose
     Simulator3D::GridPose3D firstPose;
-    firstPose.id = glb_id++;
+//    firstPose.id = glb_id++;
     Isometry3D t;
     Eigen:: Quaterniond rot;
   //  q.setIdentity();
@@ -88,7 +88,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     for(int k=0;k<numPoses;++k){
     for(int i=0;i<steps;++i){
         Simulator3D::GridPose3D nextGridPose;
-        nextGridPose.id = glb_id++;
+//        nextGridPose.id = glb_id++;
         // motion
         Isometry3D true_motion;
         Isometry3D noise_motion;
@@ -202,10 +202,11 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
 //    }// end for poses
 
     // test one land mark
-    LandmarkPtrVector& landmarksForCell = grid[0][0];
+//    LandmarkPtrVector& landmarksForCell = grid[0][0];
     Landmark* l = new Landmark();
     l->truePose = Eigen::Vector3d(1.,2.,0.0);
-    landmarksForCell.push_back(l);
+//    landmarksForCell.push_back(l);
+    landmarks_.push_back(l);
 
     cerr << "done." << endl;
 
@@ -215,21 +216,16 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     for (PosesVector::iterator it = poses_.begin(); it != poses_.end(); ++it) {
       Simulator3D::GridPose3D& pv = *it;
       Eigen::Vector3d gtTrans = pv.truePose.translation();
-      int cx = (int)round(gtTrans[0]); // x
-      int cy = (int)round(gtTrans[1]); // y
-      int cz = (int)round(gtTrans[2]); // z
-      int numGridCells = (int)(maxSensorRangeLandmarks) + 1;
+//      int cx = (int)round(gtTrans[0]); // x
+//      int cy = (int)round(gtTrans[1]); // y
+//      int cz = (int)round(gtTrans[2]); // z
+//      int numGridCells = (int)(maxSensorRangeLandmarks) + 1;
 
       pv.id = globalId++;
       Isometry3D trueInv = pv.truePose.inverse();
 
-      for (int xx = cx - numGridCells; xx <= cx + numGridCells; ++xx)
-        for (int yy = cy - numGridCells; yy <= cy + numGridCells; ++yy) {
-          LandmarkPtrVector& landmarksForCell = grid[xx][yy];
-          if (landmarksForCell.size() == 0)
-            continue;
-          for (size_t i = 0; i < landmarksForCell.size(); ++i) {
-            Landmark* l = landmarksForCell[i];
+          for (size_t i = 0; i < landmarks_.size(); ++i) {
+            Landmark* l = landmarks_[i];
             double dSqr = hypot_sqr(pv.truePose.translation().x() - l->truePose.x(), pv.truePose.translation().y() - l->truePose.y());
             if (dSqr > maxSensorSqr)
               continue;
@@ -248,9 +244,47 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
             l->seenBy.push_back(pv.id);
             pv.landmarks.push_back(l);
           } // end for i
-        } // end for yy
 
     } // end for poses
+//    for (PosesVector::iterator it = poses_.begin(); it != poses_.end(); ++it) {
+//      Simulator3D::GridPose3D& pv = *it;
+//      Eigen::Vector3d gtTrans = pv.truePose.translation();
+//      int cx = (int)round(gtTrans[0]); // x
+//      int cy = (int)round(gtTrans[1]); // y
+//      int cz = (int)round(gtTrans[2]); // z
+//      int numGridCells = (int)(maxSensorRangeLandmarks) + 1;
+
+//      pv.id = globalId++;
+//      Isometry3D trueInv = pv.truePose.inverse();
+
+//      for (int xx = cx - numGridCells; xx <= cx + numGridCells; ++xx)
+//        for (int yy = cy - numGridCells; yy <= cy + numGridCells; ++yy) {
+//          LandmarkPtrVector& landmarksForCell = grid[xx][yy];
+//          if (landmarksForCell.size() == 0)
+//            continue;
+//          for (size_t i = 0; i < landmarksForCell.size(); ++i) {
+//            Landmark* l = landmarksForCell[i];
+//            double dSqr = hypot_sqr(pv.truePose.translation().x() - l->truePose.x(), pv.truePose.translation().y() - l->truePose.y());
+//            if (dSqr > maxSensorSqr)
+//              continue;
+//            double obs = Rand::uniform_rand(0.0, 1.0);
+//            if (obs > observationProb) // we do not see this one...
+//              continue;
+//            if (l->id < 0)
+//              l->id = globalId++;
+//            if (l->seenBy.size() == 0) {
+//              Vector3d trueObservation = trueInv * l->truePose;
+//              Vector3d observation = trueObservation;
+//              observation[0] += Rand::gauss_rand(0., landmarkNoise[0]);
+//              observation[1] += Rand::gauss_rand(0., landmarkNoise[1]);
+//              l->simulatedPose = pv.simulatorPose * observation;
+//            }
+//            l->seenBy.push_back(pv.id);
+//            pv.landmarks.push_back(l);
+//          } // end for i
+//        } // end for yy
+
+//    } // end for poses
     cerr << "done." << endl;
 
     // add the odometry measurements
@@ -271,7 +305,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     }
     cerr << "done." << endl;
 
-    landmarks_.clear();
+//    landmarks_.clear();
     landmarkObservations_.clear();
     // add the landmark observations
     {
@@ -285,15 +319,15 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
 //      covariance(5, 5) = 0;
       Matrix3d information = covariance.inverse();
 
-      for (size_t i = 0; i < poses_.size(); ++i) {
-        const GridPose3D& p = poses_[i];
-        for (size_t j = 0; j < p.landmarks.size(); ++j) {
-          Landmark* l = p.landmarks[j];
-          if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
-            landmarks_.push_back(*l);
-          }
-        }
-      }
+//      for (size_t i = 0; i < poses_.size(); ++i) {
+//        const GridPose3D& p = poses_[i];
+//        for (size_t j = 0; j < p.landmarks.size(); ++j) {
+//          Landmark* l = p.landmarks[j];
+//          if (l->seenBy.size() > 0 && l->seenBy[0] == p.id) {
+//            landmarks_.push_back(*l);
+//          }
+//        }
+//      }
 
       for (size_t i = 0; i < poses_.size(); ++i) {
         const GridPose3D& p = poses_[i];
