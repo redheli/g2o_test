@@ -42,8 +42,8 @@ public:
     {
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
       int id;
-      Eigen::Isometry3d truePose;
-      Eigen::Isometry3d simulatorPose;
+      Isometry3D truePose;
+      Isometry3D simulatorPose;
       LandmarkPtrVector landmarks;      ///< the landmarks observed by this node
     };
     typedef std::vector<GridPose3D, Eigen::aligned_allocator<GridPose3D> >  PosesVector;
@@ -55,8 +55,8 @@ public:
     {
       int from;
       int to;
-      Eigen::Isometry3d trueTransf;
-      Eigen::Isometry3d simulatorTransf;
+      Isometry3D trueTransf;
+      Isometry3D simulatorTransf;
       Eigen::Matrix<double,6,6,Eigen::ColMajor> information;
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     };

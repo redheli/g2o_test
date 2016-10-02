@@ -42,6 +42,12 @@
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #include "g2o/types/slam3d/vertex_se3.h"
+#include "g2o/types/slam3d/parameter_se3_offset.h"
+#include "g2o/types/slam3d/edge_se3.h"
+#include "g2o/types/slam3d/vertex_pointxyz.h"
+#include "g2o/types/slam3d/edge_se3_pointxyz.h"
+
+#include "g2o/types/slam3d/edge_se3_offset.h"
 
 using namespace std;
 using namespace g2o;
@@ -51,10 +57,125 @@ int main()
 {
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
-  SE2 sensorOffsetTransf(0.2, 0.1, -0.1);
+  Eigen::Vector3d sensorOffsetTransf(0.2, 0.1, -0.1);
   int numNodes = 3;
   Simulator3D simulator;
-//  simulator.simulate(numNodes, sensorOffsetTransf);
+  simulator.simulate(numNodes, sensorOffsetTransf);
+
+  /*********************************************************************************
+   * creating the optimization problem
+   ********************************************************************************/
+
+  typedef BlockSolver< BlockSolverTraits<-1, -1> >  SlamBlockSolver;
+  typedef LinearSolverCSparse<SlamBlockSolver::PoseMatrixType> SlamLinearSolver;
+
+  // allocating the optimizer
+  SparseOptimizer optimizer;
+  SlamLinearSolver* linearSolver = new SlamLinearSolver();
+  linearSolver->setBlockOrdering(false);
+  SlamBlockSolver* blockSolver = new SlamBlockSolver(linearSolver);
+  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(blockSolver);
+
+  optimizer.setAlgorithm(solver);
+
+  // add the parameter representing the sensor offset
+  Isometry3D sensor_offset;
+
+  Eigen:: Quaterniond rot;
+  double roll = 0.0;// -2.05478/57.2957795;
+  double pitch = 0.0;//-0.858026/57.2957795;
+  double yaw = 0.0;//-88.083/57.2957795;
+  Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+
+  rot = yawAngle * pitchAngle * rollAngle;
+  sensor_offset = rot;
+  sensor_offset.translation() = sensorOffsetTransf;
+  ParameterSE3Offset* sensorOffset = new ParameterSE3Offset;
+  sensorOffset->setOffset(sensor_offset);
+  sensorOffset->setId(0);
+  optimizer.addParameter(sensorOffset);
+
+  // adding the odometry to the optimizer
+  // first adding all the vertices
+  cerr << "Optimization: Adding robot poses ... ";
+  for (size_t i = 0; i < simulator.poses_.size(); ++i) {
+    const Simulator3D::GridPose3D& p = simulator.poses_[i];
+    const Isometry3D& t = p.simulatorPose;
+    VertexSE3* robot =  new VertexSE3;
+    robot->setId(p.id);
+    robot->setEstimate(t);
+    optimizer.addVertex(robot);
+  }
+  cerr << "done." << endl;
+
+  // second add the odometry constraints
+  cerr << "Optimization: Adding odometry measurements ... ";
+  for (size_t i = 0; i < simulator.odometry_.size(); ++i) {
+    const Simulator3D::GridEdge3D& simEdge = simulator.odometry_[i];
+
+    EdgeSE3* odometry = new EdgeSE3;
+    odometry->vertices()[0] = optimizer.vertex(simEdge.from);
+    odometry->vertices()[1] = optimizer.vertex(simEdge.to);
+    odometry->setMeasurement(simEdge.simulatorTransf);
+    odometry->setInformation(simEdge.information);
+    optimizer.addEdge(odometry);
+  }
+  cerr << "done." << endl;
+
+  // add the landmark observations
+  cerr << "Optimization: add landmark vertices ... ";
+  for (size_t i = 0; i < simulator.landmarks_.size(); ++i) {
+    const Simulator3D::Landmark& l = simulator.landmarks_[i];
+    VertexPointXYZ* landmark = new VertexPointXYZ;
+    landmark->setId(l.id);
+    landmark->setEstimate(l.simulatedPose);
+    optimizer.addVertex(landmark);
+  }
+  cerr << "done." << endl;
+
+  cerr << "Optimization: add landmark observations ... ";
+  for (size_t i = 0; i < simulator.landmarkObservations_.size(); ++i) {
+    const Simulator3D::LandmarkEdge& simEdge = simulator.landmarkObservations_[i];
+    EdgeSE3Offset* landmarkObservation =  new EdgeSE3Offset;
+    landmarkObservation->vertices()[0] = optimizer.vertex(simEdge.from);
+    landmarkObservation->vertices()[1] = optimizer.vertex(simEdge.to);
+    landmarkObservation->setMeasurement(simEdge.simulatorMeas);
+    landmarkObservation->setInformation(simEdge.information);
+    landmarkObservation->setParameterId(0, sensorOffset->id());
+    optimizer.addEdge(landmarkObservation);
+  }
+  cerr << "done." << endl;
+
+  /*********************************************************************************
+   * optimization
+   ********************************************************************************/
+
+  // dump initial state to the disk
+  optimizer.save("slam3d_before.g2o");
+
+  // prepare and run the optimization
+  // fix the first robot pose to account for gauge freedom
+  VertexSE3* firstRobotPose = dynamic_cast<VertexSE3*>(optimizer.vertex(0));
+  firstRobotPose->setFixed(true);
+  optimizer.setVerbose(true);
+
+  cerr << "Optimizing" << endl;
+  optimizer.initializeOptimization();
+  optimizer.optimize(10);
+  cerr << "done." << endl;
+
+  optimizer.save("slam3d_after.g2o");
+
+  // freeing the graph memory
+  optimizer.clear();
+
+  // destroy all the singletons
+  Factory::destroy();
+  OptimizationAlgorithmFactory::destroy();
+  HyperGraphActionLibrary::destroy();
+
 
   return 0;
 }
