@@ -37,18 +37,28 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     int landmarksRange=2;
 
     Vector3d transNoise(0.05, 0.01, 0.02);
-    Vector3d rotNoise(DEG2RAD(3.),DEG2RAD(1.),DEG2RAD(2.)); // yaw pitch roll
+    Vector3d rotNoise(DEG2RAD(0.001),DEG2RAD(0.001),DEG2RAD(-0.5)); // yaw pitch roll
     Vector3d landmarkNoise(0.05, 0.05, 0.05);
 
-    Eigen::Matrix<double,6,6,Eigen::ColMajor> covariance;
-    covariance.fill(0.);
-    covariance(0, 0) = transNoise[0]*transNoise[0];
-    covariance(1, 1) = transNoise[1]*transNoise[1];
-    covariance(2, 2) = transNoise[2]*transNoise[2];
-    covariance(3, 3) = rotNoise[0]*rotNoise[0];
-    covariance(4, 4) = rotNoise[1]*rotNoise[1];
-    covariance(5, 5) = rotNoise[2]*rotNoise[2];
-    Eigen::Matrix<double,6,6,Eigen::ColMajor> information = covariance.inverse();
+//    Eigen::Matrix<double,6,6,Eigen::ColMajor> covariance;
+//    covariance.fill(0.);
+//    covariance(0, 0) = transNoise[0]*transNoise[0];
+//    covariance(1, 1) = transNoise[1]*transNoise[1];
+//    covariance(2, 2) = transNoise[2]*transNoise[2];
+//    covariance(3, 3) = rotNoise[0]*rotNoise[0];
+//    covariance(4, 4) = rotNoise[1]*rotNoise[1];
+//    covariance(5, 5) = rotNoise[2]*rotNoise[2];
+    Eigen::Matrix3d trans_Noise = Eigen::Matrix3d::Zero();
+    for (int i = 0; i < 3; ++i)
+      trans_Noise(i, i) = std::pow(transNoise[i], 2);
+
+    Eigen::Matrix3d rot_Noise = Eigen::Matrix3d::Zero();
+    for (int i = 0; i < 3; ++i)
+      rot_Noise(i, i) = std::pow(rotNoise[i], 2);
+
+    Eigen::Matrix<double, 6, 6> information = Eigen::Matrix<double, 6, 6>::Zero();
+    information.block<3,3>(0,0) = trans_Noise.inverse();
+    information.block<3,3>(3,3) = rot_Noise.inverse();
 
     int glb_id=0;
     // first pose
@@ -74,7 +84,8 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     // first 5 steps
     double droll = DEG2RAD(0.); // degree
     double dpitch = DEG2RAD(0.);
-    double dyaw = DEG2RAD(90.); // degree
+    double dyaw = DEG2RAD(10.); // degree
+    for(int k=0;k<numPoses;++k){
     for(int i=0;i<steps;++i){
         Simulator3D::GridPose3D nextGridPose;
         nextGridPose.id = glb_id++;
@@ -98,8 +109,8 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
         // transform
         Eigen::Vector3d t = Eigen::Vector3d(stepLen,0,0);
         Eigen::Vector3d t_n = Eigen::Vector3d(stepLen + transNoise[0],0 + transNoise[1],0 + transNoise[2]);
-        true_motion.translation() = true_motion.linear() * t;
-        noise_motion.translation() = noise_motion.linear() * t_n;
+        true_motion.translation() =  t;
+        noise_motion.translation() =  t_n;
         // pre pose
         Simulator3D::GridPose3D &pre = poses_.back();
         // next true pose
@@ -110,84 +121,92 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
         nextGridPose.simulatorPose = new_p_n;
         poses_.push_back(nextGridPose);
 
-    }
+    }// end for i
+    }// end for k
 
-    // second 5 steps
-    // droll = 0, dpitch = 0  , dyaw = -10 DEG
-    droll = DEG2RAD(0.); // degree
-    dpitch = DEG2RAD(0.);
-    dyaw = DEG2RAD(-90.); // degree
-    for(int i=0;i<steps;++i){
-        Simulator3D::GridPose3D nextGridPose;
-        nextGridPose.id = glb_id++;
-        // motion
-        Isometry3D true_motion;
-        Isometry3D noise_motion;
-        // yaw
-        Eigen::AngleAxisd rotz(dyaw / steps, Eigen::Vector3d::UnitZ());
-        Eigen::AngleAxisd rotz_n(dyaw / steps + rotNoise[0], Eigen::Vector3d::UnitZ()); // noise
-        // pitch
-        Eigen::AngleAxisd roty(dpitch / steps, Eigen::Vector3d::UnitY());
-        Eigen::AngleAxisd roty_n(dpitch / steps + rotNoise[1], Eigen::Vector3d::UnitY());
-        // roll
-        Eigen::AngleAxisd rotx(droll / steps, Eigen::Vector3d::UnitX());
-        Eigen::AngleAxisd rotx_n(droll / steps + rotNoise[2], Eigen::Vector3d::UnitX());
-        // rotation
-        Eigen::Matrix3d rot = (rotz * roty * rotx).toRotationMatrix();
-        Eigen::Matrix3d rot_n = (rotz_n * roty_n * rotx_n).toRotationMatrix();
-        true_motion = rot;
-        noise_motion = rot_n;
-        // transform
-        Eigen::Vector3d t = Eigen::Vector3d(stepLen,0,0);
-        Eigen::Vector3d t_n = Eigen::Vector3d(stepLen + transNoise[0],0 + transNoise[1],0 + transNoise[2]);
-        true_motion.translation() = true_motion.linear() * t;
-        noise_motion.translation() = noise_motion.linear() * t_n;
-        // pre pose
-        Simulator3D::GridPose3D &pre = poses_.back();
-        // next true pose
-        Isometry3D new_p = pre.truePose * true_motion;
-        // next noise pose
-        Isometry3D new_p_n = pre.simulatorPose * noise_motion;
-        nextGridPose.truePose = new_p;
-        nextGridPose.simulatorPose = new_p_n;
+//    // second 5 steps
+//    // droll = 0, dpitch = 0  , dyaw = -10 DEG
+//    droll = DEG2RAD(0.); // degree
+//    dpitch = DEG2RAD(0.);
+//    dyaw = DEG2RAD(-90.); // degree
+//    for(int i=0;i<steps;++i){
+//        Simulator3D::GridPose3D nextGridPose;
+//        nextGridPose.id = glb_id++;
+//        // motion
+//        Isometry3D true_motion;
+//        Isometry3D noise_motion;
+//        // yaw
+//        Eigen::AngleAxisd rotz(dyaw / steps, Eigen::Vector3d::UnitZ());
+//        Eigen::AngleAxisd rotz_n(dyaw / steps + rotNoise[0], Eigen::Vector3d::UnitZ()); // noise
+//        // pitch
+//        Eigen::AngleAxisd roty(dpitch / steps, Eigen::Vector3d::UnitY());
+//        Eigen::AngleAxisd roty_n(dpitch / steps + rotNoise[1], Eigen::Vector3d::UnitY());
+//        // roll
+//        Eigen::AngleAxisd rotx(droll / steps, Eigen::Vector3d::UnitX());
+//        Eigen::AngleAxisd rotx_n(droll / steps + rotNoise[2], Eigen::Vector3d::UnitX());
+//        // rotation
+//        Eigen::Matrix3d rot = (rotz * roty * rotx).toRotationMatrix();
+//        Eigen::Matrix3d rot_n = (rotz_n * roty_n * rotx_n).toRotationMatrix();
+//        true_motion = rot;
+//        noise_motion = rot_n;
+//        // transform
+//        Eigen::Vector3d t = Eigen::Vector3d(stepLen,0,0);
+//        Eigen::Vector3d t_n = Eigen::Vector3d(stepLen + transNoise[0],0 + transNoise[1],0 + transNoise[2]);
+//        true_motion.translation() = true_motion.linear() * t;
+//        noise_motion.translation() = noise_motion.linear() * t_n;
+//        // pre pose
+//        Simulator3D::GridPose3D &pre = poses_.back();
+//        // next true pose
+//        Isometry3D new_p = pre.truePose * true_motion;
+//        // next noise pose
+//        Isometry3D new_p_n = pre.simulatorPose * noise_motion;
+//        nextGridPose.truePose = new_p;
+//        nextGridPose.simulatorPose = new_p_n;
 
-        poses_.push_back(nextGridPose);
-    }
+//        poses_.push_back(nextGridPose);
+//    }
 
     // land mark
     // creating landmarks along the trajectory
     cerr << "Simulator: Creating landmarks ... ";
     LandmarkGrid grid;
-    for (PosesVector::const_iterator it = poses_.begin(); it != poses_.end(); ++it) {
-        const GridPose3D &pose = *it;
-        Eigen::Quaterniond gtQuat = (Eigen::Quaterniond)pose.truePose.linear();
-        Eigen::Vector3d gtTrans = pose.truePose.translation();
-      int ccx = (int)round(gtTrans[0]); // x
-      int ccy = (int)round(gtTrans[1]); // y
-      int ccz = (int)round(gtTrans[2]); // z
-      for (int a=-landmarksRange; a<=landmarksRange; a++)
-        for (int b=-landmarksRange; b<=landmarksRange; b++){
-          int cx=ccx+a;
-          int cy=ccy+b;
-          int cz=ccz+b;
-          LandmarkPtrVector& landmarksForCell = grid[cx][cy];
-          if (landmarksForCell.size() == 0) {
-            for (int i = 0; i < landMarksPerSquareMeter; ++i) {
-              Landmark* l = new Landmark();
-              double offx, offy, offz;
-              do {
-                offx = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
-                offy = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
-                offz = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
-              } while (hypot_sqr(offx, offy) < 0.25*0.25);
-              l->truePose[0] = cx + offx;
-              l->truePose[1] = cy + offy;
-              l->truePose[2] = cz + offz;
-              landmarksForCell.push_back(l);
-            }
-          }
-        }
-    }// end for poses
+//    for (PosesVector::const_iterator it = poses_.begin(); it != poses_.end(); ++it) {
+//        const GridPose3D &pose = *it;
+//        Eigen::Quaterniond gtQuat = (Eigen::Quaterniond)pose.truePose.linear();
+//        Eigen::Vector3d gtTrans = pose.truePose.translation();
+//      int ccx = (int)round(gtTrans[0]); // x
+//      int ccy = (int)round(gtTrans[1]); // y
+//      int ccz = (int)round(gtTrans[2]); // z
+//      for (int a=-landmarksRange; a<=landmarksRange; a++)
+//        for (int b=-landmarksRange; b<=landmarksRange; b++){
+//          int cx=ccx+a;
+//          int cy=ccy+b;
+//          int cz=ccz+b;
+//          LandmarkPtrVector& landmarksForCell = grid[cx][cy];
+//          if (landmarksForCell.size() == 0) {
+//            for (int i = 0; i < landMarksPerSquareMeter; ++i) {
+//              Landmark* l = new Landmark();
+//              double offx, offy, offz;
+//              do {
+//                offx = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+//                offy = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+//                offz = Rand::uniform_rand(-0.5*stepLen, 0.5*stepLen);
+//              } while (hypot_sqr(offx, offy) < 0.25*0.25);
+//              l->truePose[0] = cx + offx;
+//              l->truePose[1] = cy + offy;
+//              l->truePose[2] = cz + offz;
+//              landmarksForCell.push_back(l);
+//            }
+//          }
+//        }
+//    }// end for poses
+
+    // test one land mark
+    LandmarkPtrVector& landmarksForCell = grid[0][0];
+    Landmark* l = new Landmark();
+    l->truePose = Eigen::Vector3d(1.,2.,0.0);
+    landmarksForCell.push_back(l);
+
     cerr << "done." << endl;
 
     cerr << "Simulator: Simulating landmark observations for the poses ... ";
@@ -279,8 +298,20 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
       for (size_t i = 0; i < poses_.size(); ++i) {
         const GridPose3D& p = poses_[i];
         // convert sensorOffset to Isometry3D
+        Eigen:: Quaterniond rot;
+               //  q.setIdentity();
+                 double roll = 0.0;// -2.05478/57.2957795;
+                 double pitch = 0.0;//-0.858026/57.2957795;
+                 double yaw = 0.0;//-88.083/57.2957795;
+                 Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+                 Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+                 Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+
+                 rot = yawAngle * pitchAngle * rollAngle;
         Isometry3D sensor_offset;
+        sensor_offset = rot;
         sensor_offset.translation() = sensorOffset;
+        Isometry3D ttt = p.truePose * sensor_offset;
         Isometry3D trueInv = (p.truePose * sensor_offset).inverse();
         for (size_t j = 0; j < p.landmarks.size(); ++j) {
           Landmark* l = p.landmarks[j];
@@ -301,16 +332,16 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
           le.from = p.id;
           le.to = l->id;
 
-          Eigen:: Quaterniond rot;
-        //  q.setIdentity();
-          double roll = 0.0;// -2.05478/57.2957795;
-          double pitch = 0.0;//-0.858026/57.2957795;
-          double yaw = 0.0;//-88.083/57.2957795;
-          Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
-          Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
-          Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+//          Eigen:: Quaterniond rot;
+//        //  q.setIdentity();
+//          double roll = 0.0;// -2.05478/57.2957795;
+//          double pitch = 0.0;//-0.858026/57.2957795;
+//          double yaw = 0.0;//-88.083/57.2957795;
+//          Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+//          Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+//          Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
 
-          rot = yawAngle * pitchAngle * rollAngle;
+//          rot = yawAngle * pitchAngle * rollAngle;
 //          Isometry3D trueObservation_m;
 //          trueObservation_m = rot;
 //          trueObservation_m.translation() = trueObservation;
