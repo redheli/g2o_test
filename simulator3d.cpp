@@ -36,7 +36,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
 
     int landmarksRange=2;
 
-    Vector3d transNoise(0.1, 0.01, 0.2);
+    transNoise = Eigen::Vector3d(0.1, 0.01, 0.2);
     Vector3d rotNoise(DEG2RAD(0.3),DEG2RAD(0.6),DEG2RAD(0.8)); // yaw pitch roll
 //    Vector3d rotNoise(0.005,0.005,0.005); // yaw pitch roll
     Vector3d landmarkNoise(0.05, 0.05, 0.05);
@@ -57,7 +57,7 @@ void Simulator3D::simulate(int numPoses, const Eigen::Vector3d &sensorOffset, bo
     for (int i = 0; i < 3; ++i)
       rot_Noise(i, i) = std::pow(rotNoise[i], 2);
 
-    Eigen::Matrix<double, 6, 6> information = Eigen::Matrix<double, 6, 6>::Zero();
+    information = Eigen::Matrix<double, 6, 6>::Zero();
     information.block<3,3>(0,0) = trans_Noise.inverse();
     information.block<3,3>(3,3) = rot_Noise.inverse();
 

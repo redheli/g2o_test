@@ -87,6 +87,8 @@ public:
     GridEdge3DVector odometry_;
     LandmarkPtrVector landmarks_;
     LandmarkEdgeVector landmarkObservations_;
+    Eigen::Matrix<double, 6, 6> information;
+    Eigen::Vector3d transNoise;
 };
 
   } // end namespace

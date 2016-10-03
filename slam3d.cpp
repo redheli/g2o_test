@@ -48,6 +48,7 @@
 #include "g2o/types/slam3d/edge_se3_pointxyz.h"
 
 #include "g2o/types/slam3d/edge_se3_offset.h"
+#include "rand.h"
 
 using namespace std;
 using namespace g2o;
@@ -123,6 +124,29 @@ int main()
     optimizer.addEdge(odometry);
   }
   cerr << "done." << endl;
+
+  // generate loop closure edges
+  const Simulator3D::GridPose3D& from_pose = simulator.poses_.back();
+  const Simulator3D::GridPose3D& to_pose = simulator.poses_[0];
+  Isometry3D simulatorTransf = from_pose.truePose.inverse() * to_pose.truePose;
+          Eigen::Quaterniond gtQuat = (Eigen::Quaterniond)simulatorTransf.linear();
+          Eigen::Vector3d gtTrans = simulatorTransf.translation();
+          double offx = Rand::uniform_rand(-abs(simulator.transNoise[0])*10, abs(simulator.transNoise[0])*10 );
+          double offy = Rand::uniform_rand(-abs(simulator.transNoise[1])*10, abs(simulator.transNoise[1])*10 );
+          double offz = Rand::uniform_rand(-abs(simulator.transNoise[2])*10, abs(simulator.transNoise[2])*10 );
+          Eigen::Vector3d gtTrans_sim = Eigen::Vector3d(gtTrans[0]+offx,gtTrans[1]+offy, gtTrans[2]+offz);
+
+           Isometry3D simulatorTransf_sim;
+           simulatorTransf_sim = gtQuat;
+           simulatorTransf_sim.translation() = gtTrans_sim;
+
+        EdgeSE3* e = new EdgeSE3;
+        e->vertices()[0] = optimizer.vertex(from_pose.id);
+        e->vertices()[1] = optimizer.vertex(to_pose.id);
+        e->setMeasurement(simulatorTransf_sim);
+        e->setInformation(simulator.information);
+        optimizer.addEdge(e);
+
 
   // add the landmark observations
   cerr << "Optimization: add landmark vertices ... ";
